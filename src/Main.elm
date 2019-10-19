@@ -1,13 +1,15 @@
-module Main exposing (Message(..), Model, Status(..), init, update)
+module Main exposing (main)
 
+import BlogModel exposing (..)
 import Browser
 import Browser.Navigation
+import ColorScheme exposing (..)
 import Css exposing (..)
 import Html
 import Html.Styled exposing (..)
 import Html.Styled.Attributes exposing (..)
+import Html.Styled.Events exposing (onClick)
 import Http
-import Json.Decode exposing (Decoder, field, int, maybe, string)
 import Url
 
 
@@ -34,23 +36,6 @@ main =
 -- MODEL
 
 
-type alias Blog =
-    { id : String
-    , author : Maybe Author
-    , date : String
-    , title : String
-    , summary : String
-    }
-
-
-type alias Author =
-    { id : String
-    , username : String
-    , firstName : Maybe String
-    , surname : Maybe String
-    }
-
-
 type alias Model =
     { blogs : List Blog
     , status : Status
@@ -73,55 +58,6 @@ init flags url key =
         , expect = Http.expectJson BlogResponse blogListDecoder
         }
     )
-
-
-blogListDecoder : Decoder (List Blog)
-blogListDecoder =
-    Json.Decode.list blogDecoder
-
-
-blogDecoder : Decoder Blog
-blogDecoder =
-    Json.Decode.map5 Blog
-        (field "_id" string)
-        (maybe (field "author" authorDecoder))
-        (field "date" string)
-        (field "title" string)
-        (field "summary" string)
-
-
-authorDecoder : Decoder Author
-authorDecoder =
-    Json.Decode.map4 Author
-        (field "_id" string)
-        (field "username" string)
-        (maybe (field "firstName" string))
-        (maybe (field "surname" string))
-
-
-blogAuthor : Blog -> String
-blogAuthor blog =
-    case blog.author of
-        Just author ->
-            String.concat [ "by ", authorName author ]
-
-        Nothing ->
-            "Unknown Author"
-
-
-authorName : Author -> String
-authorName author =
-    case author.firstName of
-        Just firstName ->
-            case author.surname of
-                Just surname ->
-                    String.concat [ firstName, " ", surname ]
-
-                Nothing ->
-                    firstName
-
-        Nothing ->
-            author.username
 
 
 
@@ -173,41 +109,59 @@ subscriptions model =
 view : Model -> Browser.Document Message
 view model =
     { title = programName
-    , body = [ toUnstyled (pageBody model) ]
+    , body = [ toUnstyled (page model) ]
     }
+
+
+page : Model -> Html Message
+page model =
+    div [ css [ pageContainer] ]
+        [ navBar model
+        , pageBody model
+        ]
+
+
+navBar : Model -> Html Message
+navBar model =
+    div [ css [ navBarContainer ] ]
+        [ div [css [navBarItem]] [text programName]
+        ]
 
 
 pageBody : Model -> Html Message
 pageBody model =
-    div [ css [ page ] ]
-        (case model.status of
-            Loading ->
-                [ text "loading" ]
+    div [ css [ bodyContainer ] ] (pageBodySelector model)
 
-            Success blogs ->
-                [ h1 [] [ text programName ]
-                , listBlogs blogs
-                ]
 
-            Failure error ->
-                [ text "failed to get blogs - "
-                , case error of
-                    Http.BadStatus status ->
-                        errorContainer (String.fromInt status)
+pageBodySelector : Model -> List (Html Message)
+pageBodySelector model =
+    case model.status of
+        Loading ->
+            [ text "loading" ]
 
-                    Http.NetworkError ->
-                        errorContainer "Error with network"
+        Success blogs ->
+            [ h1 [] [ text programName ]
+            , listBlogs blogs
+            ]
 
-                    Http.BadUrl url ->
-                        errorContainer (String.concat [ "Error using URL: ", url ])
+        Failure error ->
+            [ text "failed to get blogs - "
+            , case error of
+                Http.BadStatus status ->
+                    errorContainer (String.fromInt status)
 
-                    Http.Timeout ->
-                        errorContainer "Got nothing back"
+                Http.NetworkError ->
+                    errorContainer "Error with network"
 
-                    Http.BadBody message ->
-                        errorContainer message
-                ]
-        )
+                Http.BadUrl url ->
+                    errorContainer (String.concat [ "Error using URL: ", url ])
+
+                Http.Timeout ->
+                    errorContainer "Got nothing back"
+
+                Http.BadBody message ->
+                    errorContainer message
+            ]
 
 
 listBlogs : List Blog -> Html Message
@@ -217,10 +171,14 @@ listBlogs blogsList =
 
 blogCard : Blog -> Html Message
 blogCard blog =
-    div [ css [ card ] ]
-        [ text (String.concat [ blog.title, ", ", blogAuthor blog, "; " ])
+    a [ css [ card, subtleHyperlink ], href (blogDetailLink blog) ]
+        [ div [ css [ cardTitle ] ] [ text (String.concat [ blog.title, ", ", blogAuthor blog, "; " ]) ]
         , div [] [ text blog.summary ]
         ]
+
+
+blogDetailLink blog =
+    String.concat [ "/blog/", blog.id ]
 
 
 errorContainer errorMessage =
@@ -233,12 +191,37 @@ errorContainer errorMessage =
 
 -- STYLES
 
+pageContainer : Style 
+pageContainer =
+    batch   
+        [
+            fontFamilies ["Verdana", "Arial"]
+        ]
 
-page : Style
-page =
+
+navBarContainer : Style
+navBarContainer =
     batch
-        [ backgroundColor (rgb 250 250 3),
-        Css.height (pct 100)
+        [ backgroundColor background
+        , color navBarText
+        , Css.height (Css.em 3)
+        , displayFlex
+        , alignItems center
+        ]
+
+navBarItem : Style
+navBarItem =
+    batch 
+        [
+            padding (Css.em 1)
+            , fontSize large
+        ]
+
+
+bodyContainer : Style
+bodyContainer =
+    batch
+        [ margin (Css.em 2)
         ]
 
 
@@ -260,6 +243,23 @@ errorView =
 card : Style
 card =
     batch
-        [ backgroundColor (rgb 250 4 250)
-        , margin (px 10)
+        [ border3 (px 1) solid background
+        , margin (px 4)
+        , padding (Css.em 1)
+        , borderRadius (px 5)
+        ]
+
+
+subtleHyperlink : Style
+subtleHyperlink =
+    batch
+        [ textDecoration none
+        , color textColor
+        ]
+
+
+cardTitle : Style
+cardTitle =
+    batch
+        [ marginBottom (Css.em 1)
         ]
