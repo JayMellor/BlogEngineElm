@@ -2,7 +2,7 @@ module Main exposing (main)
 
 import BlogModel exposing (..)
 import Browser
-import Browser.Navigation
+import Browser.Navigation as Nav
 import ColorScheme exposing (..)
 import Css exposing (..)
 import Css.Global
@@ -12,6 +12,7 @@ import Html.Styled.Attributes exposing (..)
 import Html.Styled.Events exposing (onClick)
 import Http
 import Url
+import Url.Parser as Parser exposing ((</>))
 
 
 
@@ -40,8 +41,8 @@ main =
 type alias Model =
     { blogs : List Blog
     , status : Status
-    , key : Browser.Navigation.Key
-    , url : Url.Url
+    , key : Nav.Key
+    , currentRoute : Route
     }
 
 
@@ -51,9 +52,9 @@ type Status
     | Failure Http.Error
 
 
-init : () -> Url.Url -> Browser.Navigation.Key -> ( Model, Cmd Message )
+init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Message )
 init flags url key =
-    ( Model [] Loading key url
+    ( Model [] Loading key (url |> Url.toString |> toRoute)
     , Http.get
         { url = "http://localhost:4080/api/blogs"
         , expect = Http.expectJson BlogResponse blogListDecoder
@@ -83,15 +84,39 @@ update message model =
                     ( { model | blogs = [], status = Failure msg }, Cmd.none )
 
         UrlChanged url ->
-            ( { model | url = url }, Cmd.none )
+            ( { model | currentRoute = url |> Url.toString |> toRoute  }, Cmd.none )
 
         LinkClicked urlRequest ->
             case urlRequest of
                 Browser.Internal url ->
-                    ( model, Browser.Navigation.pushUrl model.key (Url.toString url) )
+                    ( model, Nav.pushUrl model.key (Url.toString url) )
 
                 Browser.External href ->
-                    ( model, Browser.Navigation.load href )
+                    ( model, Nav.load href )
+
+
+type Route
+    = Blogs
+    | Blog String
+    | NotFound
+
+
+routeParser : Parser.Parser (Route -> a) a
+routeParser =
+    Parser.oneOf
+        [ Parser.map Blogs (Parser.s "blogs")
+        , Parser.map Blog (Parser.s "blog" </> Parser.string)
+        ]
+
+
+toRoute : String -> Route
+toRoute string =
+    case Url.fromString string of
+        Nothing ->
+            NotFound
+
+        Just url ->
+            Maybe.withDefault NotFound (Parser.parse routeParser url)
 
 
 
@@ -116,6 +141,15 @@ view model =
                 [ div [ css [ mainContentContainer ] ]
                     [ navBar model
                     , pageBody model
+                    , div [] [
+                        text (case model.currentRoute of
+                            NotFound -> 
+                                "Not found"
+                            Blogs -> 
+                                "Blog List"
+                            Blog blogId -> 
+                                "Blog " ++ blogId)
+                    ]
                     ]
                 , pageFooter model
                 ]
@@ -141,8 +175,6 @@ globalStyleNode =
             [ -- Unstyled node wrapping the content in toUnstyled
               Css.height (pct 100)
             ]
-
-        -- Css.Global.class here
         ]
 
 
