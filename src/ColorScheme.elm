@@ -5,6 +5,10 @@ import Css exposing (Color, rgb)
 
 background : Color
 background =
+    rgb 240 241 245
+
+navBarBackground : Color
+navBarBackground =
     rgb 66 70 89
 
 navBarText : Color

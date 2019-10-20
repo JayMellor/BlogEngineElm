@@ -5,6 +5,7 @@ import Browser
 import Browser.Navigation
 import ColorScheme exposing (..)
 import Css exposing (..)
+import Css.Global
 import Html
 import Html.Styled exposing (..)
 import Html.Styled.Attributes exposing (..)
@@ -109,28 +110,66 @@ subscriptions model =
 view : Model -> Browser.Document Message
 view model =
     { title = programName
-    , body = [ toUnstyled (page model) ]
+    , body =
+        [ toUnstyled
+            (page []
+                [ div [ css [ mainContentContainer ] ]
+                    [ navBar model
+                    , pageBody model
+                    ]
+                , pageFooter model
+                ]
+            )
+        ]
     }
 
 
-page : Model -> Html Message
-page model =
-    div [ css [ pageContainer] ]
-        [ navBar model
-        , pageBody model
+globalStyleNode : Html Message
+globalStyleNode =
+    Css.Global.global
+        [ Css.Global.html
+            [ backgroundColor background
+            , fontFamilies [ "Verdana", "Arial" ]
+            , Css.height (pct 100)
+            ]
+        , Css.Global.body
+            [ margin (px 0)
+            , border (px 0)
+            , Css.height (pct 100)
+            ]
+        , Css.Global.class "unstyled"
+            [ -- Unstyled node wrapping the content in toUnstyled
+              Css.height (pct 100)
+            ]
+
+        -- Css.Global.class here
         ]
+
+
+page : List (Attribute Message) -> List (Html Message) -> Html Message
+page attributes children =
+    styled div
+        []
+        attributes
+        (globalStyleNode :: children)
 
 
 navBar : Model -> Html Message
 navBar model =
     div [ css [ navBarContainer ] ]
-        [ div [css [navBarItem]] [text programName]
+        [ div [ css [ navBarItem ] ] [ text programName ]
         ]
 
 
 pageBody : Model -> Html Message
 pageBody model =
     div [ css [ bodyContainer ] ] (pageBodySelector model)
+
+
+pageFooter : Model -> Html Message
+pageFooter model =
+    footer [ css [ footerContainer ] ]
+        [ div [ css [ navBarItem ] ] [ text "By Jay Mellor" ] ]
 
 
 pageBodySelector : Model -> List (Html Message)
@@ -140,8 +179,7 @@ pageBodySelector model =
             [ text "loading" ]
 
         Success blogs ->
-            [ h1 [] [ text programName ]
-            , listBlogs blogs
+            [ listBlogs blogs
             ]
 
         Failure error ->
@@ -172,7 +210,7 @@ listBlogs blogsList =
 blogCard : Blog -> Html Message
 blogCard blog =
     a [ css [ card, subtleHyperlink ], href (blogDetailLink blog) ]
-        [ div [ css [ cardTitle ] ] [ text (String.concat [ blog.title, ", ", blogAuthor blog, "; " ]) ]
+        [ div [ css [ cardTitle ] ] [ text (String.concat [ blog.title, " ", blogAuthor blog ]) ]
         , div [] [ text blog.summary ]
         ]
 
@@ -191,37 +229,46 @@ errorContainer errorMessage =
 
 -- STYLES
 
-pageContainer : Style 
-pageContainer =
-    batch   
-        [
-            fontFamilies ["Verdana", "Arial"]
+
+mainContentContainer : Style
+mainContentContainer =
+    batch
+        [ Css.height (pct 100)
+        , Css.minHeight (pct 100)
         ]
 
 
 navBarContainer : Style
 navBarContainer =
     batch
-        [ backgroundColor background
+        [ backgroundColor navBarBackground
         , color navBarText
         , Css.height (Css.em 3)
         , displayFlex
         , alignItems center
         ]
 
+
 navBarItem : Style
 navBarItem =
-    batch 
-        [
-            padding (Css.em 1)
-            , fontSize large
+    batch
+        [ padding (Css.em 1)
+        , fontSize large
         ]
 
 
 bodyContainer : Style
 bodyContainer =
     batch
-        [ margin (Css.em 2)
+        [ padding (Css.em 2)
+        ]
+
+
+footerContainer : Style
+footerContainer =
+    batch
+        [ navBarContainer
+        , flexDirection rowReverse
         ]
 
 
@@ -243,7 +290,7 @@ errorView =
 card : Style
 card =
     batch
-        [ border3 (px 1) solid background
+        [ border3 (px 1) solid navBarBackground
         , margin (px 4)
         , padding (Css.em 1)
         , borderRadius (px 5)
@@ -262,4 +309,5 @@ cardTitle : Style
 cardTitle =
     batch
         [ marginBottom (Css.em 1)
+        , fontWeight bold
         ]
