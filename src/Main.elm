@@ -19,10 +19,12 @@ import Url.Parser as Parser exposing ((</>))
 -- MAIN
 
 
+programName : String
 programName =
     "Blog Engine"
 
 
+main : Program () Model Message
 main =
     Browser.application
         { init = init
@@ -53,7 +55,7 @@ type Status
 
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Message )
-init flags url key =
+init _ url key =
     ( Model [] Loading key (url |> Url.toString |> toRoute)
     , Http.get
         { url = "http://localhost:4080/api/blogs"
@@ -84,7 +86,7 @@ update message model =
                     ( { model | blogs = [], status = Failure msg }, Cmd.none )
 
         UrlChanged url ->
-            ( { model | currentRoute = url |> Url.toString |> toRoute  }, Cmd.none )
+            ( { model | currentRoute = url |> Url.toString |> toRoute }, Cmd.none )
 
         LinkClicked urlRequest ->
             case urlRequest of
@@ -141,15 +143,19 @@ view model =
                 [ div [ css [ mainContentContainer ] ]
                     [ navBar model
                     , pageBody model
-                    , div [] [
-                        text (case model.currentRoute of
-                            NotFound -> 
-                                "Not found"
-                            Blogs -> 
-                                "Blog List"
-                            Blog blogId -> 
-                                "Blog " ++ blogId)
-                    ]
+                    , div []
+                        [ text
+                            (case model.currentRoute of
+                                NotFound ->
+                                    "Not found"
+
+                                Blogs ->
+                                    "Blog List"
+
+                                Blog blogId ->
+                                    "Blog " ++ blogId
+                            )
+                        ]
                     ]
                 , pageFooter model
                 ]
