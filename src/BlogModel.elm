@@ -1,4 +1,4 @@
-module BlogModel exposing (..)
+module BlogModel exposing (Blog, blogAuthor, blogListDecoder)
 
 import Json.Decode as JD
 
@@ -23,9 +23,11 @@ type alias Author =
 
 -- DECODERS
 
+
 blogListDecoder : JD.Decoder (List Blog)
 blogListDecoder =
     JD.list blogDecoder
+
 
 blogDecoder : JD.Decoder Blog
 blogDecoder =

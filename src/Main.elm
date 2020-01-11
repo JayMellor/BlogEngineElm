@@ -1,16 +1,14 @@
 module Main exposing (main)
 
-import BlogModel exposing (..)
+import BlogModel exposing (Blog)
 import Browser
 import Browser.Navigation as Nav
 import ColorScheme exposing (..)
 import Css exposing (..)
 import Css.Global
-import Html
 import Html.Styled exposing (..)
 import Html.Styled.Attributes exposing (..)
-import Html.Styled.Events exposing (onClick)
-import Http
+import Page.BlogList as BlogList
 import Url
 import Url.Parser as Parser exposing ((</>))
 
@@ -41,26 +39,65 @@ main =
 
 
 type alias Model =
-    { blogs : List Blog
-    , status : Status
-    , key : Nav.Key
+    { key : Nav.Key
     , currentRoute : Route
+    , currentPage : Page
     }
-
-
-type Status
-    = Loading
-    | Success (List Blog)
-    | Failure Http.Error
 
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Message )
 init _ url key =
-    ( Model [] Loading key (url |> Url.toString |> toRoute)
-    , Http.get
-        { url = "http://localhost:4080/api/blogs"
-        , expect = Http.expectJson BlogResponse blogListDecoder
-        }
+    let
+        model =
+            { key = key
+            , currentRoute = url |> Url.toString |> toRoute
+            , currentPage = NotFoundPage
+            }
+    in
+    initCurrentPage
+        ( model
+        , Cmd.none
+        )
+
+
+type Page
+    = NotFoundPage
+    | BlogList BlogList.Model
+    | ShowBlog String
+
+
+
+-- Initalise the page from the route. Initialise a module relating to the page
+-- todo needed?
+
+
+initCurrentPage : ( Model, Cmd Message ) -> ( Model, Cmd Message )
+initCurrentPage ( model, existingCommands ) =
+    let
+        ( currentPage, mappedPageCommands ) =
+            case model.currentRoute of
+                Head ->
+                    let
+                        ( blogModel, blogCmds ) =
+                            BlogList.init ()
+                    in
+                    ( BlogList blogModel, Cmd.map BlogListMessageReceived blogCmds )
+
+                Blogs ->
+                    let
+                        ( blogModel, blogCmds ) =
+                            BlogList.init ()
+                    in
+                    ( BlogList blogModel, Cmd.map BlogListMessageReceived blogCmds )
+
+                Blog blogId ->
+                    ( ShowBlog blogId, Cmd.none )
+
+                NotFound ->
+                    ( NotFoundPage, Cmd.none )
+    in
+    ( { model | currentPage = currentPage }
+    , Cmd.batch [ existingCommands, mappedPageCommands ]
     )
 
 
@@ -69,26 +106,19 @@ init _ url key =
 
 
 type Message
-    = BlogResponse (Result Http.Error (List Blog))
-    | UrlChanged Url.Url
+    = UrlChanged Url.Url
     | LinkClicked Browser.UrlRequest
+    | BlogListMessageReceived BlogList.Message
 
 
 update : Message -> Model -> ( Model, Cmd Message )
 update message model =
-    case message of
-        BlogResponse response ->
-            case response of
-                Ok blogs ->
-                    ( { model | blogs = blogs, status = Success blogs }, Cmd.none )
-
-                Err msg ->
-                    ( { model | blogs = [], status = Failure msg }, Cmd.none )
-
-        UrlChanged url ->
+    case ( message, model.currentPage ) of
+        ( UrlChanged url, _ ) ->
             ( { model | currentRoute = url |> Url.toString |> toRoute }, Cmd.none )
+                |> initCurrentPage
 
-        LinkClicked urlRequest ->
+        ( LinkClicked urlRequest, _ ) ->
             case urlRequest of
                 Browser.Internal url ->
                     ( model, Nav.pushUrl model.key (Url.toString url) )
@@ -96,9 +126,27 @@ update message model =
                 Browser.External href ->
                     ( model, Nav.load href )
 
+        ( BlogListMessageReceived subMessage, BlogList blogListModel ) ->
+            BlogList.update subMessage blogListModel 
+                |> updateTo BlogList BlogListMessageReceived model
 
+        ( _, _ ) ->
+            ( model, Cmd.none )
+
+-- todo simplify below?
+updateTo : (subModel -> Page) 
+    -> (subMessage -> Message) 
+    -> Model
+    -> (subModel, Cmd subMessage)
+    -> (Model, Cmd Message)
+updateTo toPage toMessage model (subModel, subCmd) =
+    (Model model.key model.currentRoute (toPage subModel)
+    , Cmd.map toMessage subCmd)
+
+-- remove Head?
 type Route
-    = Blogs
+    = Head
+    | Blogs
     | Blog String
     | NotFound
 
@@ -106,7 +154,8 @@ type Route
 routeParser : Parser.Parser (Route -> a) a
 routeParser =
     Parser.oneOf
-        [ Parser.map Blogs (Parser.s "blogs")
+        [ Parser.map Head Parser.top
+        , Parser.map Blogs (Parser.s "blogs")
         , Parser.map Blog (Parser.s "blog" </> Parser.string)
         ]
 
@@ -126,7 +175,7 @@ toRoute string =
 
 
 subscriptions : Model -> Sub Message
-subscriptions model =
+subscriptions _ =
     Sub.none
 
 
@@ -143,19 +192,6 @@ view model =
                 [ div [ css [ mainContentContainer ] ]
                     [ navBar model
                     , pageBody model
-                    , div []
-                        [ text
-                            (case model.currentRoute of
-                                NotFound ->
-                                    "Not found"
-
-                                Blogs ->
-                                    "Blog List"
-
-                                Blog blogId ->
-                                    "Blog " ++ blogId
-                            )
-                        ]
                     ]
                 , pageFooter model
                 ]
@@ -201,7 +237,7 @@ navBar model =
 
 pageBody : Model -> Html Message
 pageBody model =
-    div [ css [ bodyContainer ] ] (pageBodySelector model)
+    div [ css [ bodyContainer ] ] [ pageBodySelector model ]
 
 
 pageFooter : Model -> Html Message
@@ -210,58 +246,17 @@ pageFooter model =
         [ div [ css [ navBarItem ] ] [ text "By Jay Mellor" ] ]
 
 
-pageBodySelector : Model -> List (Html Message)
+pageBodySelector : Model -> Html Message
 pageBodySelector model =
-    case model.status of
-        Loading ->
-            [ text "loading" ]
+    case model.currentPage of
+        NotFoundPage ->
+            div [] [ text "not found" ]
 
-        Success blogs ->
-            [ listBlogs blogs
-            ]
+        BlogList blogListModel ->
+            BlogList.view blogListModel |> Html.Styled.map BlogListMessageReceived
 
-        Failure error ->
-            [ text "failed to get blogs - "
-            , case error of
-                Http.BadStatus status ->
-                    errorContainer (String.fromInt status)
-
-                Http.NetworkError ->
-                    errorContainer "Error with network"
-
-                Http.BadUrl url ->
-                    errorContainer (String.concat [ "Error using URL: ", url ])
-
-                Http.Timeout ->
-                    errorContainer "Got nothing back"
-
-                Http.BadBody message ->
-                    errorContainer message
-            ]
-
-
-listBlogs : List Blog -> Html Message
-listBlogs blogsList =
-    div [ css [ listContainer ] ] (List.map blogCard blogsList)
-
-
-blogCard : Blog -> Html Message
-blogCard blog =
-    a [ css [ card, subtleHyperlink ], href (blogDetailLink blog) ]
-        [ div [ css [ cardTitle ] ] [ text (String.concat [ blog.title, " ", blogAuthor blog ]) ]
-        , div [] [ text blog.summary ]
-        ]
-
-
-blogDetailLink blog =
-    String.concat [ "/blog/", blog.id ]
-
-
-errorContainer errorMessage =
-    div [ css [ errorView ] ]
-        [ text "Error with page - "
-        , text errorMessage
-        ]
+        ShowBlog _ ->
+            div [] [ text "Not implemented yet" ]
 
 
 
@@ -307,45 +302,4 @@ footerContainer =
     batch
         [ navBarContainer
         , flexDirection rowReverse
-        ]
-
-
-listContainer : Style
-listContainer =
-    batch
-        [ displayFlex
-        , flexDirection column
-        ]
-
-
-errorView : Style
-errorView =
-    batch
-        [ border (px 12)
-        ]
-
-
-card : Style
-card =
-    batch
-        [ border3 (px 1) solid navBarBackground
-        , margin (px 4)
-        , padding (Css.em 1)
-        , borderRadius (px 5)
-        ]
-
-
-subtleHyperlink : Style
-subtleHyperlink =
-    batch
-        [ textDecoration none
-        , color textColor
-        ]
-
-
-cardTitle : Style
-cardTitle =
-    batch
-        [ marginBottom (Css.em 1)
-        , fontWeight bold
         ]
