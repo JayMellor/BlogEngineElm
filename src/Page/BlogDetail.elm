@@ -1,4 +1,4 @@
-module BlogDetail exposing (..)
+module Page.BlogDetail exposing (..)
 
 {-| View the blog post
 -}
@@ -11,6 +11,28 @@ type alias Model =
     }
 
 
+init : () -> ( Model, Cmd Message )
+init _ =
+    let
+        model =
+            { key1 = "not implemented yet"
+            }
+    in
+    ( model, Cmd.none )
+
+
 
 -- UPDATE
+
+
+type Message
+    = String
+
+
+update : Message -> Model -> ( Model, Cmd Message )
+update message model =
+    ( model, Cmd.none )
+
+
+
 -- VIEW

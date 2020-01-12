@@ -1,6 +1,8 @@
 module Main exposing (main)
 
-import BlogModel exposing (Blog)
+{-| Central module handling routing, messages and subscriptions
+-}
+
 import Browser
 import Browser.Navigation as Nav
 import ColorScheme exposing (..)
@@ -8,6 +10,7 @@ import Css exposing (..)
 import Css.Global
 import Html.Styled exposing (..)
 import Html.Styled.Attributes exposing (..)
+import Page.BlogDetail as BlogDetail
 import Page.BlogList as BlogList
 import Url
 import Url.Parser as Parser exposing ((</>))
@@ -45,12 +48,18 @@ type alias Model =
     }
 
 
+type Page
+    = NotFoundPage
+    | BlogListPage BlogList.Model
+    | BlogDetailPage String BlogDetail.Model
+
+
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Message )
 init _ url key =
     let
         model =
             { key = key
-            , currentRoute = url |> Url.toString |> toRoute
+            , currentRoute = toRoute url
             , currentPage = NotFoundPage
             }
     in
@@ -60,38 +69,33 @@ init _ url key =
         )
 
 
-type Page
-    = NotFoundPage
-    | BlogList BlogList.Model
-    | ShowBlog String
-
-
-
--- Initalise the page from the route. Initialise a module relating to the page
--- todo needed?
-
-
+{-| Initialises the page as set by the route
+-}
 initCurrentPage : ( Model, Cmd Message ) -> ( Model, Cmd Message )
 initCurrentPage ( model, existingCommands ) =
     let
         ( currentPage, mappedPageCommands ) =
             case model.currentRoute of
                 Head ->
+                    -- todo find better way of redirecting to Blogs
+                    ( NotFoundPage, Nav.pushUrl model.key "/blogs" )
+
+                BlogListRoute ->
+                    -- todo find general way to convert messages etc if necessary
                     let
-                        ( blogModel, blogCmds ) =
+                        ( blogListModel, blogListCmds ) =
                             BlogList.init ()
                     in
-                    ( BlogList blogModel, Cmd.map BlogListMessageReceived blogCmds )
+                    ( BlogListPage blogListModel, Cmd.map BlogListMessageReceived blogListCmds )
 
-                Blogs ->
+                BlogDetailRoute blogId ->
                     let
-                        ( blogModel, blogCmds ) =
-                            BlogList.init ()
+                        ( blogDetailModel, blogDetailCmds ) =
+                            BlogDetail.init ()
                     in
-                    ( BlogList blogModel, Cmd.map BlogListMessageReceived blogCmds )
-
-                Blog blogId ->
-                    ( ShowBlog blogId, Cmd.none )
+                    ( BlogDetailPage blogId blogDetailModel
+                    , Cmd.map BlogDetailMessageReceived blogDetailCmds
+                    )
 
                 NotFound ->
                     ( NotFoundPage, Cmd.none )
@@ -109,13 +113,15 @@ type Message
     = UrlChanged Url.Url
     | LinkClicked Browser.UrlRequest
     | BlogListMessageReceived BlogList.Message
+    | BlogDetailMessageReceived BlogDetail.Message
 
 
 update : Message -> Model -> ( Model, Cmd Message )
 update message model =
     case ( message, model.currentPage ) of
+        -- General messages
         ( UrlChanged url, _ ) ->
-            ( { model | currentRoute = url |> Url.toString |> toRoute }, Cmd.none )
+            ( { model | currentRoute = toRoute url }, Cmd.none )
                 |> initCurrentPage
 
         ( LinkClicked urlRequest, _ ) ->
@@ -126,48 +132,63 @@ update message model =
                 Browser.External href ->
                     ( model, Nav.load href )
 
-        ( BlogListMessageReceived subMessage, BlogList blogListModel ) ->
-            BlogList.update subMessage blogListModel 
-                |> updateTo BlogList BlogListMessageReceived model
+        -- Page-specific messages
+        ( BlogListMessageReceived subMessage, BlogListPage blogListModel ) ->
+            BlogList.update subMessage blogListModel
+                |> updateUsing BlogListPage BlogListMessageReceived model
+
+        ( BlogDetailMessageReceived subMessage, BlogDetailPage blogId blogDetailModel ) ->
+            BlogDetail.update subMessage blogDetailModel
+                |> updateUsing (BlogDetailPage blogId) BlogDetailMessageReceived model
 
         ( _, _ ) ->
             ( model, Cmd.none )
 
--- todo simplify below?
-updateTo : (subModel -> Page) 
-    -> (subMessage -> Message) 
-    -> Model
-    -> (subModel, Cmd subMessage)
-    -> (Model, Cmd Message)
-updateTo toPage toMessage model (subModel, subCmd) =
-    (Model model.key model.currentRoute (toPage subModel)
-    , Cmd.map toMessage subCmd)
 
--- remove Head?
+{-| Provide an updated model and command according to submodule's message.
+
+    updateUsing SubPage SubMessageReceived model (SubModel.update SubMessage subModel)
+
+    will update the submodule model with SubMessage while updating the model with SubMessageReceived
+
+-}
+updateUsing :
+    (subModel -> Page)
+    -> (subMessage -> Message)
+    -> Model
+    -> ( subModel, Cmd subMessage )
+    -> ( Model, Cmd Message )
+updateUsing page subMessage model ( subModel, subCmd ) =
+    ( Model model.key model.currentRoute (page subModel)
+    , Cmd.map subMessage subCmd
+    )
+
+
+
+-- ROUTES
+
+
 type Route
     = Head
-    | Blogs
-    | Blog String
+    | BlogListRoute
+    | BlogDetailRoute String
     | NotFound
+
+
+{-| Converts a URL to a route using the parser
+-}
+toRoute : Url.Url -> Route
+toRoute url =
+    Maybe.withDefault NotFound (Parser.parse routeParser url)
 
 
 routeParser : Parser.Parser (Route -> a) a
 routeParser =
     Parser.oneOf
         [ Parser.map Head Parser.top
-        , Parser.map Blogs (Parser.s "blogs")
-        , Parser.map Blog (Parser.s "blog" </> Parser.string)
+        , Parser.map BlogListRoute (Parser.s "blogs")
+        , Parser.map BlogDetailRoute (Parser.s "blog" </> Parser.string)
         ]
-
-
-toRoute : String -> Route
-toRoute string =
-    case Url.fromString string of
-        Nothing ->
-            NotFound
-
-        Just url ->
-            Maybe.withDefault NotFound (Parser.parse routeParser url)
 
 
 
@@ -188,7 +209,7 @@ view model =
     { title = programName
     , body =
         [ toUnstyled
-            (page []
+            (styledPage []
                 [ div [ css [ mainContentContainer ] ]
                     [ navBar model
                     , pageBody model
@@ -200,6 +221,16 @@ view model =
     }
 
 
+styledPage : List (Attribute Message) -> List (Html Message) -> Html Message
+styledPage attributes children =
+    styled div
+        []
+        attributes
+        (globalStyleNode :: children)
+
+
+{-| Sets gobal styles to e.g. the html and body nodes of the DOM
+-}
 globalStyleNode : Html Message
 globalStyleNode =
     Css.Global.global
@@ -218,14 +249,6 @@ globalStyleNode =
               Css.height (pct 100)
             ]
         ]
-
-
-page : List (Attribute Message) -> List (Html Message) -> Html Message
-page attributes children =
-    styled div
-        []
-        attributes
-        (globalStyleNode :: children)
 
 
 navBar : Model -> Html Message
@@ -252,10 +275,10 @@ pageBodySelector model =
         NotFoundPage ->
             div [] [ text "not found" ]
 
-        BlogList blogListModel ->
+        BlogListPage blogListModel ->
             BlogList.view blogListModel |> Html.Styled.map BlogListMessageReceived
 
-        ShowBlog _ ->
+        BlogDetailPage _ _ ->
             div [] [ text "Not implemented yet" ]
 
 
