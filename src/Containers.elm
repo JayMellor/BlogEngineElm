@@ -1,4 +1,4 @@
-module Containers exposing (card, cardTitle, errorContainer, listContainer, subtleHyperlink)
+module Containers exposing (card, cardTitle, errorContainer, listContainer, showError, subtleHyperlink)
 
 {-| View containers
 -}
@@ -7,10 +7,30 @@ import ColorScheme exposing (navBarBackground, textColor)
 import Css exposing (..)
 import Html.Styled exposing (..)
 import Html.Styled.Attributes exposing (css)
+import Http
 
 
 
 -- ELEMENTS
+
+
+showError : Http.Error -> Html a
+showError httpError =
+    case httpError of
+        Http.BadStatus status ->
+            errorContainer (String.fromInt status)
+
+        Http.NetworkError ->
+            errorContainer "Error with network"
+
+        Http.BadUrl url ->
+            errorContainer (String.concat [ "Error using URL: ", url ])
+
+        Http.Timeout ->
+            errorContainer "Got nothing back"
+
+        Http.BadBody message ->
+            errorContainer message
 
 
 errorContainer : String -> Html a

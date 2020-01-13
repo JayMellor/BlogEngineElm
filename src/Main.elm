@@ -91,7 +91,7 @@ initCurrentPage ( model, existingCommands ) =
                 BlogDetailRoute blogId ->
                     let
                         ( blogDetailModel, blogDetailCmds ) =
-                            BlogDetail.init ()
+                            BlogDetail.init blogId
                     in
                     ( BlogDetailPage blogId blogDetailModel
                     , Cmd.map BlogDetailMessageReceived blogDetailCmds
@@ -278,8 +278,8 @@ pageBodySelector model =
         BlogListPage blogListModel ->
             BlogList.view blogListModel |> Html.Styled.map BlogListMessageReceived
 
-        BlogDetailPage _ _ ->
-            div [] [ text "Not implemented yet" ]
+        BlogDetailPage blogId blogDetailModel ->
+            BlogDetail.view blogDetailModel |> Html.Styled.map BlogDetailMessageReceived 
 
 
 

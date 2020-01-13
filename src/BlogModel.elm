@@ -1,4 +1,4 @@
-module BlogModel exposing (Blog, blogAuthor, blogListDecoder)
+module BlogModel exposing (Blog, blogAuthor, blogListDecoder, blogDecoder)
 
 import Json.Decode as JD
 
@@ -9,6 +9,7 @@ type alias Blog =
     , date : String
     , title : String
     , summary : String
+    , content : Maybe String
     }
 
 
@@ -31,12 +32,13 @@ blogListDecoder =
 
 blogDecoder : JD.Decoder Blog
 blogDecoder =
-    JD.map5 Blog
+    JD.map6 Blog
         (JD.field "_id" JD.string)
         (JD.maybe (JD.field "author" authorDecoder))
         (JD.field "date" JD.string)
         (JD.field "title" JD.string)
         (JD.field "summary" JD.string)
+        (JD.maybe (JD.field "content" JD.string))
 
 
 authorDecoder : JD.Decoder Author

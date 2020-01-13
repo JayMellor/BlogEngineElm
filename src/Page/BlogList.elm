@@ -1,10 +1,10 @@
-module Page.BlogList exposing (..)
+module Page.BlogList exposing (Message, Model, init, update, view)
 
 {-| View a list of Blogs
 -}
 
 import BlogModel exposing (Blog, blogAuthor, blogListDecoder)
-import Containers exposing (card, cardTitle, errorContainer, listContainer, subtleHyperlink)
+import Containers exposing (card, cardTitle, listContainer, showError, subtleHyperlink)
 import Html.Styled exposing (..)
 import Html.Styled.Attributes exposing (css, href)
 import Http
@@ -67,39 +67,26 @@ update message model =
 
 
 -- VIEW
-
 -- todo move to below signature if necessary
 -- view : Model -> { title : String, content : Html Message }
-view : Model ->  Html Message 
+
+
+view : Model -> Html Message
 view model =
-        div []
-            (case model.status of
-                Loading ->
-                    [ text "loading" ]
+    div []
+        (case model.status of
+            Loading ->
+                [ text "loading" ]
 
-                Success blogs ->
-                    [ listBlogs blogs
-                    ]
+            Success blogs ->
+                [ listBlogs blogs
+                ]
 
-                Failure error ->
-                    [ text "failed to get blogs - "
-                    , case error of
-                        Http.BadStatus status ->
-                            errorContainer (String.fromInt status)
-
-                        Http.NetworkError ->
-                            errorContainer "Error with network"
-
-                        Http.BadUrl url ->
-                            errorContainer (String.concat [ "Error using URL: ", url ])
-
-                        Http.Timeout ->
-                            errorContainer "Got nothing back"
-
-                        Http.BadBody message ->
-                            errorContainer message
-                    ]
-            )
+            Failure error ->
+                [ text "failed to get blogs - "
+                , showError error
+                ]
+        )
 
 
 listBlogs : List Blog -> Html Message
