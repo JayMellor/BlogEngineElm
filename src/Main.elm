@@ -10,6 +10,7 @@ import Css exposing (..)
 import Css.Global
 import Html.Styled exposing (..)
 import Html.Styled.Attributes exposing (..)
+import Page exposing (Skeleton)
 import Page.BlogDetail as BlogDetail
 import Page.BlogList as BlogList
 import Url
@@ -112,6 +113,7 @@ initCurrentPage ( model, existingCommands ) =
 type Message
     = UrlChanged Url.Url
     | LinkClicked Browser.UrlRequest
+      -- Page messages
     | BlogListMessageReceived BlogList.Message
     | BlogDetailMessageReceived BlogDetail.Message
 
@@ -187,7 +189,7 @@ routeParser =
     Parser.oneOf
         [ Parser.map Head Parser.top
         , Parser.map BlogListRoute (Parser.s "blogs")
-        , Parser.map BlogDetailRoute (Parser.s "blog" </> Parser.string)
+        , Parser.map BlogDetailRoute (Parser.s "blogs" </> Parser.string)
         ]
 
 
@@ -206,13 +208,17 @@ subscriptions _ =
 
 view : Model -> Browser.Document Message
 view model =
-    { title = programName
+    let
+        { title, content } =
+            pageSelector model
+    in
+    { title = title
     , body =
         [ toUnstyled
             (styledPage []
                 [ div [ css [ mainContentContainer ] ]
                     [ navBar model
-                    , pageBody model
+                    , content
                     ]
                 , pageFooter model
                 ]
@@ -258,9 +264,9 @@ navBar model =
         ]
 
 
-pageBody : Model -> Html Message
-pageBody model =
-    div [ css [ bodyContainer ] ] [ pageBodySelector model ]
+pageBody : Skeleton Message -> Skeleton Message
+pageBody skeleton =
+    { skeleton | content = div [ css [ bodyContainer ] ] [ skeleton.content ] }
 
 
 pageFooter : Model -> Html Message
@@ -269,17 +275,17 @@ pageFooter model =
         [ div [ css [ navBarItem ] ] [ text "By Jay Mellor" ] ]
 
 
-pageBodySelector : Model -> Html Message
-pageBodySelector model =
+pageSelector : Model -> Skeleton Message
+pageSelector model =
     case model.currentPage of
         NotFoundPage ->
-            div [] [ text "not found" ]
+            { title = "Not Found", content = div [] [ text "not found" ] } |> pageBody
 
         BlogListPage blogListModel ->
-            BlogList.view blogListModel |> Html.Styled.map BlogListMessageReceived
+            { title = "Blog List", content = BlogList.view blogListModel |> Html.Styled.map BlogListMessageReceived } |> pageBody
 
         BlogDetailPage blogId blogDetailModel ->
-            BlogDetail.view blogDetailModel |> Html.Styled.map BlogDetailMessageReceived 
+            { title = "Blog " ++ blogId, content = BlogDetail.view blogDetailModel |> Html.Styled.map BlogDetailMessageReceived } |> pageBody
 
 
 

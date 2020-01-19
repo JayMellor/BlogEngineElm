@@ -3,7 +3,7 @@ module Page.BlogList exposing (Message, Model, init, update, view)
 {-| View a list of Blogs
 -}
 
-import BlogModel exposing (Blog, blogAuthor, blogListDecoder)
+import Blog exposing (Blog, Summary, blogAuthor, blogListDecoder)
 import Containers exposing (card, cardTitle, listContainer, showError, subtleHyperlink)
 import Html.Styled exposing (..)
 import Html.Styled.Attributes exposing (css, href)
@@ -15,14 +15,14 @@ import Http
 
 
 type alias Model =
-    { blogs : List Blog
+    { blogs : List (Blog Summary)
     , status : Status
     }
 
 
 type Status
     = Loading
-    | Success (List Blog)
+    | Success (List (Blog Summary))
     | Failure Http.Error
 
 
@@ -50,7 +50,7 @@ getBlogs =
 
 
 type Message
-    = BlogResponse (Result Http.Error (List Blog))
+    = BlogResponse (Result Http.Error (List (Blog Summary)))
 
 
 update : Message -> Model -> ( Model, Cmd Message )
@@ -67,8 +67,6 @@ update message model =
 
 
 -- VIEW
--- todo move to below signature if necessary
--- view : Model -> { title : String, content : Html Message }
 
 
 view : Model -> Html Message
@@ -89,19 +87,34 @@ view model =
         )
 
 
-listBlogs : List Blog -> Html Message
+listBlogs : List (Blog Summary) -> Html Message
 listBlogs blogsList =
     div [ css [ listContainer ] ] (List.map blogCard blogsList)
 
 
-blogCard : Blog -> Html Message
+blogCard : Blog Summary -> Html Message
 blogCard blog =
+    let
+        { title } =
+            Blog.details blog
+
+        summaryText =
+            Blog.summary blog
+    in
     a [ css [ card, subtleHyperlink ], href (blogDetailLink blog) ]
-        [ div [ css [ cardTitle ] ] [ text (String.concat [ blog.title, " ", blogAuthor blog ]) ]
-        , div [] [ text blog.summary ]
+        [ div [ css [ cardTitle ] ] [ text (String.concat [ title, " ", blogAuthor blog ]) ]
+        , div [] [ text summaryText ]
         ]
 
 
-blogDetailLink : Blog -> String
+
+-- todo convert to Tasks
+
+
+blogDetailLink : Blog Summary -> String
 blogDetailLink blog =
-    String.concat [ "/blog/", blog.id ]
+    let
+        { id } =
+            Blog.details blog
+    in
+    String.concat [ "/blogs/", id ]

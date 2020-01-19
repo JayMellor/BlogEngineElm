@@ -3,10 +3,11 @@ module Page.BlogDetail exposing (Message, Model, init, update, view)
 {-| View the blog post
 -}
 
-import BlogModel exposing (Blog, blogDecoder)
+import Blog exposing (Blog, Content, blogContentDecoder)
 import Containers exposing (showError)
 import Html.Styled exposing (..)
 import Http
+import Markdown
 
 
 
@@ -15,10 +16,10 @@ import Http
 
 type Model
     = New
-    | Display
     | Edit
+    | Preview (Blog Content)
     | Loading String
-    | Loaded Blog
+    | Loaded (Blog Content)
     | Failed Http.Error
     | Saving
     | Saved
@@ -33,7 +34,7 @@ init blogId =
         cmd =
             Http.get
                 { url = "http://localhost:4080/api/blogs/" ++ blogId
-                , expect = Http.expectJson BlogResponse blogDecoder
+                , expect = Http.expectJson BlogResponse blogContentDecoder
                 }
     in
     ( model, cmd )
@@ -44,7 +45,7 @@ init blogId =
 
 
 type Message
-    = BlogResponse (Result Http.Error Blog)
+    = BlogResponse (Result Http.Error (Blog Content))
 
 
 update : Message -> Model -> ( Model, Cmd Message )
@@ -79,14 +80,16 @@ view model =
             text "Not implemented yet"
 
 
-showBlog : Blog -> Html Message
+showBlog : Blog Content -> Html Message
 showBlog blog =
-    div []
-        [ h3 [] [ text blog.title ]
-        , case blog.content of
-            Just content ->
-                p [] [ text content ]
+    let
+        content =
+            Blog.content blog
 
-            Nothing ->
-                p [] [ text "No content" ]
+        { title } =
+            Blog.details blog
+    in
+    div []
+        [ h3 [] [ text title ]
+        , Markdown.toHtml [] content |> Html.Styled.fromUnstyled
         ]
