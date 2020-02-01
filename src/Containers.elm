@@ -41,6 +41,10 @@ errorContainer errorMessage =
         ]
 
 
+
+-- STYLES
+
+
 cardTitle : Style
 cardTitle =
     batch
@@ -73,10 +77,6 @@ subtleHyperlink =
         [ textDecoration none
         , color textColor
         ]
-
-
-
--- STYLES
 
 
 errorView : Style

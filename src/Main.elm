@@ -10,7 +10,8 @@ import Css exposing (..)
 import Css.Global
 import Html.Styled exposing (..)
 import Html.Styled.Attributes exposing (..)
-import Page exposing (Skeleton)
+import NavBar
+import Page exposing (Page(..), Skeleton)
 import Page.BlogDetail as BlogDetail
 import Page.BlogList as BlogList
 import Url
@@ -19,11 +20,6 @@ import Url.Parser as Parser exposing ((</>))
 
 
 -- MAIN
-
-
-programName : String
-programName =
-    "Blog Engine"
 
 
 main : Program () Model Message
@@ -46,13 +42,8 @@ type alias Model =
     { key : Nav.Key
     , currentRoute : Route
     , currentPage : Page
+    , navBar : NavBar.Model
     }
-
-
-type Page
-    = NotFoundPage
-    | BlogListPage BlogList.Model
-    | BlogDetailPage String BlogDetail.Model
 
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Message )
@@ -62,6 +53,7 @@ init _ url key =
             { key = key
             , currentRoute = toRoute url
             , currentPage = NotFoundPage
+            , navBar = NavBar.init
             }
     in
     initCurrentPage
@@ -113,7 +105,8 @@ initCurrentPage ( model, existingCommands ) =
 type Message
     = UrlChanged Url.Url
     | LinkClicked Browser.UrlRequest
-      -- Page messages
+      -- Submodel messages
+    | NavBarMessageReceived NavBar.Message
     | BlogListMessageReceived BlogList.Message
     | BlogDetailMessageReceived BlogDetail.Message
 
@@ -134,7 +127,11 @@ update message model =
                 Browser.External href ->
                     ( model, Nav.load href )
 
-        -- Page-specific messages
+        -- todo add update
+        -- Submodel-specific messages
+        ( NavBarMessageReceived subMessage, _ ) ->
+            ( model, Cmd.none )
+
         ( BlogListMessageReceived subMessage, BlogListPage blogListModel ) ->
             BlogList.update subMessage blogListModel
                 |> updateUsing BlogListPage BlogListMessageReceived model
@@ -160,8 +157,8 @@ updateUsing :
     -> Model
     -> ( subModel, Cmd subMessage )
     -> ( Model, Cmd Message )
-updateUsing page subMessage model ( subModel, subCmd ) =
-    ( Model model.key model.currentRoute (page subModel)
+updateUsing page subMessage { key, currentRoute, navBar } ( subModel, subCmd ) =
+    ( Model key currentRoute (page subModel) navBar
     , Cmd.map subMessage subCmd
     )
 
@@ -217,7 +214,8 @@ view model =
         [ toUnstyled
             (styledPage []
                 [ div [ css [ mainContentContainer ] ]
-                    [ navBar model
+                    [ NavBar.view model.navBar
+                        |> Html.Styled.map NavBarMessageReceived
                     , content
                     ]
                 , pageFooter model
@@ -257,22 +255,19 @@ globalStyleNode =
         ]
 
 
-navBar : Model -> Html Message
-navBar model =
-    div [ css [ navBarContainer ] ]
-        [ div [ css [ navBarItem ] ] [ text programName ]
-        ]
-
-
 pageBody : Skeleton Message -> Skeleton Message
 pageBody skeleton =
     { skeleton | content = div [ css [ bodyContainer ] ] [ skeleton.content ] }
 
 
+
+-- todo add class
+
+
 pageFooter : Model -> Html Message
 pageFooter model =
     footer [ css [ footerContainer ] ]
-        [ div [ css [ navBarItem ] ] [ text "By Jay Mellor" ] ]
+        [ div [ css [] ] [ text "By Jay Mellor" ] ]
 
 
 pageSelector : Model -> Skeleton Message
@@ -300,25 +295,6 @@ mainContentContainer =
         ]
 
 
-navBarContainer : Style
-navBarContainer =
-    batch
-        [ backgroundColor navBarBackground
-        , color navBarText
-        , Css.height (Css.em 3)
-        , displayFlex
-        , alignItems center
-        ]
-
-
-navBarItem : Style
-navBarItem =
-    batch
-        [ padding (Css.em 1)
-        , fontSize large
-        ]
-
-
 bodyContainer : Style
 bodyContainer =
     batch
@@ -326,9 +302,12 @@ bodyContainer =
         ]
 
 
+
+-- todo add class
+
+
 footerContainer : Style
 footerContainer =
     batch
-        [ navBarContainer
-        , flexDirection rowReverse
+        [ flexDirection rowReverse
         ]
