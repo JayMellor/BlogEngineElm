@@ -53,7 +53,7 @@ init _ url key =
             { key = key
             , currentRoute = toRoute url
             , currentPage = NotFoundPage
-            , navBar = NavBar.init
+            , navBar = NavBar.init programName
             }
     in
     initCurrentPage
@@ -200,6 +200,20 @@ subscriptions _ =
 
 
 
+-- TITLE
+
+
+programName : String
+programName =
+    "Blog Engine"
+
+
+formatTitle : String -> String
+formatTitle text =
+    text ++ " | " ++ programName
+
+
+
 -- VIEW
 
 
@@ -255,6 +269,10 @@ globalStyleNode =
         ]
 
 
+
+-- todo check this?
+
+
 pageBody : Skeleton Message -> Skeleton Message
 pageBody skeleton =
     { skeleton | content = div [ css [ bodyContainer ] ] [ skeleton.content ] }
@@ -274,13 +292,31 @@ pageSelector : Model -> Skeleton Message
 pageSelector model =
     case model.currentPage of
         NotFoundPage ->
-            { title = "Not Found", content = div [] [ text "not found" ] } |> pageBody
+            { title = formatTitle "Not Found"
+            , content = div [] [ text "not found" ]
+            }
+                |> pageBody
 
         BlogListPage blogListModel ->
-            { title = "Blog List", content = BlogList.view blogListModel |> Html.Styled.map BlogListMessageReceived } |> pageBody
+            { title =
+                BlogList.pageTitle
+                    |> formatTitle
+            , content =
+                BlogList.view blogListModel
+                    |> Html.Styled.map BlogListMessageReceived
+            }
+                |> pageBody
 
-        BlogDetailPage blogId blogDetailModel ->
-            { title = "Blog " ++ blogId, content = BlogDetail.view blogDetailModel |> Html.Styled.map BlogDetailMessageReceived } |> pageBody
+        BlogDetailPage _ blogDetailModel ->
+            { title =
+                blogDetailModel
+                    |> BlogDetail.pageTitle
+                    |> formatTitle
+            , content =
+                BlogDetail.view blogDetailModel
+                    |> Html.Styled.map BlogDetailMessageReceived
+            }
+                |> pageBody
 
 
 

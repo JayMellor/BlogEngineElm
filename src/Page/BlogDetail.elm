@@ -1,4 +1,4 @@
-module Page.BlogDetail exposing (Message, Model, init, update, view)
+module Page.BlogDetail exposing (Message, Model, init, pageTitle, update, view)
 
 {-| View the blog post
 -}
@@ -38,6 +38,21 @@ init blogId =
                 }
     in
     ( model, cmd )
+
+
+pageTitle : Model -> String
+pageTitle model =
+    case model of
+        Loaded blog ->
+            let
+                { title } =
+                    Blog.details blog
+            in
+            title
+
+        _ ->
+            -- todo
+            "todo"
 
 
 

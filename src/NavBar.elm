@@ -10,11 +10,6 @@ import Html.Styled.Attributes exposing (css)
 import Page exposing (Page(..))
 
 
-programName : String
-programName =
-    "Blog Engine"
-
-
 
 -- MODEL
 
@@ -22,6 +17,7 @@ programName =
 type alias Model =
     { active : Page
     , authState : AuthState
+    , appName : String
     }
 
 
@@ -30,9 +26,9 @@ type AuthState
     | LoggedIn
 
 
-init : Model
-init =
-    Model Page.NotFoundPage NotLoggedIn
+init : String -> Model
+init title =
+    Model Page.NotFoundPage NotLoggedIn title
 
 
 
@@ -65,9 +61,9 @@ update message navBar =
 
 
 view : Model -> Html Message
-view { active, authState } =
+view { active, authState, appName } =
     div [ css [ navBarContainer ] ]
-        [ div [ css [ navBarItem ] ] [ text programName ]
+        [ div [ css [ navBarItem ] ] [ text appName ]
         , div [] [ authCard authState ]
         ]
 

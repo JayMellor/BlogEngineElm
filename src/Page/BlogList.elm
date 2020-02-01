@@ -1,4 +1,4 @@
-module Page.BlogList exposing (Message, Model, init, update, view)
+module Page.BlogList exposing (Message, Model, init, pageTitle, update, view)
 
 {-| View a list of Blogs
 -}
@@ -45,6 +45,11 @@ getBlogs =
         }
 
 
+pageTitle : String
+pageTitle =
+    "Blog List"
+
+
 
 -- UPDATE
 
@@ -71,8 +76,8 @@ update message model =
 
 view : Model -> Html Message
 view model =
-    div []
-        (case model.status of
+    div [] <|
+        case model.status of
             Loading ->
                 [ text "loading" ]
 
@@ -84,7 +89,6 @@ view model =
                 [ text "failed to get blogs - "
                 , showError error
                 ]
-        )
 
 
 listBlogs : List (Blog Summary) -> Html Message
