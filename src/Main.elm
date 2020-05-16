@@ -14,8 +14,8 @@ import NavBar
 import Page exposing (Page(..), Skeleton)
 import Page.BlogDetail as BlogDetail
 import Page.BlogList as BlogList
+import Route exposing (Route(..))
 import Url
-import Url.Parser as Parser exposing ((</>))
 
 
 
@@ -51,15 +51,12 @@ init _ url key =
     let
         model =
             { key = key
-            , currentRoute = toRoute url
+            , currentRoute = Route.toRoute url
             , currentPage = NotFoundPage
             , navBar = NavBar.init programName
             }
     in
-    initCurrentPage
-        ( model
-        , Cmd.none
-        )
+    initCurrentPage model
 
 
 {-| Initialises the page as set by the route
@@ -74,12 +71,13 @@ initCurrentPage ( model, existingCommands ) =
                     ( NotFoundPage, Nav.pushUrl model.key "/blogs" )
 
                 BlogListRoute ->
-                    -- todo find general way to convert messages etc if necessary
                     let
                         ( blogListModel, blogListCmds ) =
                             BlogList.init ()
                     in
-                    ( BlogListPage blogListModel, Cmd.map BlogListMessageReceived blogListCmds )
+                    ( BlogListPage blogListModel
+                    , Cmd.map BlogListMessageReceived blogListCmds
+                    )
 
                 BlogDetailRoute blogId ->
                     let
@@ -94,7 +92,10 @@ initCurrentPage ( model, existingCommands ) =
                     ( NotFoundPage, Cmd.none )
     in
     ( { model | currentPage = currentPage }
-    , Cmd.batch [ existingCommands, mappedPageCommands ]
+    , Cmd.batch
+        [ existingCommands
+        , mappedPageCommands
+        ]
     )
 
 
@@ -116,8 +117,7 @@ update message model =
     case ( message, model.currentPage ) of
         -- General messages
         ( UrlChanged url, _ ) ->
-            ( { model | currentRoute = toRoute url }, Cmd.none )
-                |> initCurrentPage
+            urlChanged url
 
         ( LinkClicked urlRequest, _ ) ->
             case urlRequest of
@@ -157,37 +157,29 @@ updateUsing :
     -> Model
     -> ( subModel, Cmd subMessage )
     -> ( Model, Cmd Message )
-updateUsing page subMessage { key, currentRoute, navBar } ( subModel, subCmd ) =
-    ( Model key currentRoute (page subModel) navBar
-    , Cmd.map subMessage subCmd
+updateUsing page subMessageReceived model ( subModel, subCmd ) =
+    ( { model | currentPage = page subModel }
+    , Cmd.map subMessageReceived subCmd
     )
 
 
+urlChanged : Url.Url -> Model -> ( Model, Cmd Message )
+urlChanged url model =
+    let
+        newRoute =
+            Route.toRoute url
 
--- ROUTES
-
-
-type Route
-    = Head
-    | BlogListRoute
-    | BlogDetailRoute String
-    | NotFound
-
-
-{-| Converts a URL to a route using the parser
--}
-toRoute : Url.Url -> Route
-toRoute url =
-    Maybe.withDefault NotFound (Parser.parse routeParser url)
-
-
-routeParser : Parser.Parser (Route -> a) a
-routeParser =
-    Parser.oneOf
-        [ Parser.map Head Parser.top
-        , Parser.map BlogListRoute (Parser.s "blogs")
-        , Parser.map BlogDetailRoute (Parser.s "blogs" </> Parser.string)
-        ]
+        ( navBar, navBarCmds ) =
+            NavBar.update (NavBar.RouteLoaded newRoute) model.navBar
+                |> updateUsing model.currentPage NavBarMessageReceived model
+    in
+    ( { model
+        | currentRoute = newRoute
+        , navBar = navBar
+      }
+    , NavBarMessageReceived navBarCmds
+    )
+        |> initCurrentPage
 
 
 

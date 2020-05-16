@@ -7,7 +7,7 @@ import ColorScheme exposing (navBarBackground, navBarText)
 import Css exposing (..)
 import Html.Styled exposing (Html, div, text)
 import Html.Styled.Attributes exposing (css)
-import Page exposing (Page(..))
+import Route exposing (Route(..))
 
 
 
@@ -15,7 +15,7 @@ import Page exposing (Page(..))
 
 
 type alias Model =
-    { active : Page
+    { active : Route
     , authState : AuthState
     , appName : String
     }
@@ -28,7 +28,32 @@ type AuthState
 
 init : String -> Model
 init title =
-    Model Page.NotFoundPage NotLoggedIn title
+    Model NotFound NotLoggedIn title
+
+
+
+-- DISPLAYED LINKS
+
+
+links : List DisplayedLink
+links =
+    [ { route = BlogListRoute
+      , description = "Blogs"
+      , link = "/blogs"
+      }
+    ]
+
+
+type alias DisplayedLink =
+    { route : Route
+    , description : String
+    , link : String
+    }
+
+
+type DisplayedLinks
+    = NoneActive (List DisplayedLink)
+    | OneActive (List DisplayedLink) DisplayedLink
 
 
 
@@ -36,7 +61,7 @@ init title =
 
 
 type Message
-    = PageLoaded Page
+    = RouteLoaded Route
     | LogInSuccess
     | LogOutSuccess
 
@@ -44,8 +69,8 @@ type Message
 update : Message -> Model -> ( Model, Cmd Message )
 update message navBar =
     case message of
-        PageLoaded page ->
-            ( { navBar | active = page }
+        RouteLoaded route ->
+            ( { navBar | active = route }
             , Cmd.none
             )
 
@@ -64,8 +89,24 @@ view : Model -> Html Message
 view { active, authState, appName } =
     div [ css [ navBarContainer ] ]
         [ div [ css [ navBarItem ] ] [ text appName ]
+        , linkList active
         , div [] [ authCard authState ]
         ]
+
+
+brightenActiveLink : Route -> DisplayedLink -> Html Message
+brightenActiveLink activePage link =
+    if activePage == link.route then
+        div [] [text "active"]
+
+    else
+        div [] [text "not"]
+
+
+linkList : Route -> Html Message
+linkList active =
+    div [] <|
+        List.map (brightenActiveLink active) links
 
 
 authCard : AuthState -> Html Message
